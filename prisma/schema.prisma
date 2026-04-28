@@ -1,0 +1,33 @@
+generator client {
+  provider     = "prisma-client-js"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  manager
+  user
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  login        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  role         UserRole @default(user)
+}
+
+model Summarize {
+  id          Int      @id @default(autoincrement())
+  description String
+  transcribe  String
+  summarize   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
