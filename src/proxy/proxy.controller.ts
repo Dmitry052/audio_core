@@ -9,41 +9,41 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import axios, { AxiosError } from 'axios';
+import { Agent } from 'http';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PROXY_REST_TARGET, PROXY_REST_PATH } from '../constants';
-
-interface RawRequest extends Request {
-  rawBody?: Buffer;
-}
 
 @Controller('proxy')
 @UseGuards(JwtAuthGuard)
 export class ProxyController {
-  constructor(private readonly configService: ConfigService) {}
+  private readonly url: string;
+  private readonly httpAgent = new Agent({ keepAlive: true, maxSockets: 50 });
+
+  constructor(configService: ConfigService) {
+    const base = configService.get<string>('PROXY_REST_TARGET', PROXY_REST_TARGET);
+    const path = configService.get<string>('PROXY_REST_PATH', PROXY_REST_PATH);
+    this.url = `${base}${path}`;
+  }
 
   /**
-   * Proxies a WAV audio stream to the configured backend REST service.
-   * Send Content-Type: audio/wav (or application/octet-stream) with raw WAV bytes.
-   * The backend response is streamed back to the caller.
+   * Pipes the incoming audio stream directly to the upstream backend without buffering.
+   * This avoids holding large WAV files in memory under high concurrency.
    */
   @Post('audio')
-  async proxyAudio(@Req() req: RawRequest, @Res() res: Response): Promise<void> {
-    const base = this.configService.get<string>('PROXY_REST_TARGET', PROXY_REST_TARGET);
-    const path = this.configService.get<string>('PROXY_REST_PATH', PROXY_REST_PATH);
-    const url = `${base}${path}`;
-
-    // rawBody is populated by NestFactory.create({ rawBody: true })
-    const body = req.rawBody ?? (req.body as Buffer | undefined);
-
+  async proxyAudio(@Req() req: Request, @Res() res: Response): Promise<void> {
     try {
-      const upstream = await axios.post(url, body, {
+      const upstream = await axios.post(this.url, req, {
         headers: {
           'content-type': req.headers['content-type'] ?? 'audio/wav',
-          ...(body?.length ? { 'content-length': String(body.length) } : {}),
+          ...(req.headers['content-length']
+            ? { 'content-length': req.headers['content-length'] }
+            : { 'transfer-encoding': 'chunked' }),
         },
         responseType: 'stream',
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
+        timeout: 30_000,
+        httpAgent: this.httpAgent,
       });
 
       res.status(upstream.status);

@@ -38,7 +38,7 @@ npm install
 cp .env.example .env
 
 # 3. Start PostgreSQL 18
-docker-compose up -d
+docker compose up -d
 
 # 4. Generate Prisma client and apply migrations (creates tables + seeds users)
 npx prisma generate

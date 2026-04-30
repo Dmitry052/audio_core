@@ -9,12 +9,14 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SummarizeService } from './summarize.service';
 import { CreateSummarizeDto } from './dto/create-summarize.dto';
 import { UpdateSummarizeDto } from './dto/update-summarize.dto';
+import { QuerySummarizeDto } from './dto/query-summarize.dto';
 
 @Controller('summarize')
 @UseGuards(JwtAuthGuard)
@@ -22,8 +24,8 @@ export class SummarizeController {
   constructor(private readonly summarizeService: SummarizeService) {}
 
   @Get()
-  findAll() {
-    return this.summarizeService.findAll();
+  findAll(@Query() query: QuerySummarizeDto) {
+    return this.summarizeService.findAll(query.skip ?? 0, query.take ?? 20);
   }
 
   @Get(':id')
